@@ -6,7 +6,6 @@ import {
   motion,
   AnimatePresence,
   Variants,
-  useScroll,
 } from "motion/react";
 import { personalProjects as projects, templates } from "@/constants";
 import Card from "@/components/Home/Card";
@@ -16,6 +15,8 @@ import RotatingText from "@/components/RotatingText";
 import Footer from "@/components/Home/Footer";
 
 type Tab = "projects" | "templates" | "skills";
+  const tabs: Tab[] = ["templates", "projects", "skills"];
+
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("templates");
@@ -27,9 +28,7 @@ export default function Home() {
   const prevTabRef = useRef<Tab>(activeTab);
   const footerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll();
 
-  const tabs: Tab[] = ["templates", "projects", "skills"];
 
   const tabLabels = {
     templates: "Templates",
@@ -52,10 +51,12 @@ export default function Home() {
 
   const checkFooterPosition = useCallback(() => {
     if (!footerRef.current) return;
+
     const scrollPosition = window.innerHeight + window.scrollY;
     const documentHeight = document.documentElement.scrollHeight;
     const footerHeight = footerRef.current.offsetHeight;
     const threshold = 100;
+
     setIsFooterFixed(scrollPosition < documentHeight - footerHeight - threshold);
   }, []);
 
@@ -102,7 +103,7 @@ export default function Home() {
         animate="visible"
       >
         <h1 className="text-2xl font-semibold text-main-text dark:text-main-text">
-          Hey, I'm Rakshit
+          Hey, I&apos;m Rakshit
         </h1>
         <div className="w-10 h-10 flex items-center justify-center">
           <ThemeToggle />
@@ -114,8 +115,6 @@ export default function Home() {
 
       {/* Social Icons */}
       <SocialIcons isMounted={isMounted} variants={headerVariants} />
-
-
 
       {/* Tabs */}
       <motion.div
@@ -207,7 +206,6 @@ export default function Home() {
           </motion.div>
         </AnimatePresence>
       </div>
-
 
       {/* Footer */}
       <Footer isFooterFixed={isFooterFixed} footerRef={footerRef} />

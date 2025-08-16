@@ -2,10 +2,11 @@
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import NextImage from "next/image"; // alias to avoid clashing with global Image
 
 interface TooltipPreviewProps {
   url: string | null;
-  image: string | null;
+  image: string | null; // local /public path or remote (allow in next.config.js)
   children: React.ReactNode;
 }
 
@@ -18,27 +19,26 @@ const getHostname = (link: string) => {
   }
 };
 
-export default function TooltipPreview({ url, image, children }: TooltipPreviewProps) {
+export default function TooltipPreview({
+  url,
+  image,
+  children,
+}: TooltipPreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   const [visible, setVisible] = useState(false);
   const [placement, setPlacement] = useState<"top" | "bottom">("bottom");
-  const [loading, setLoading] = useState<boolean>(!!image);
+  const [loading, setLoading] = useState<boolean>(false);
   const hideTimeoutRef = useRef<number | null>(null);
 
-  /** Optional: preload image when becoming visible */
+  /** When tooltip opens: if there's an image, show skeleton until Next/Image completes */
   useEffect(() => {
-    if (!visible) return;
-    if (!image) {
+    if (!visible) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const img = new Image();
-    img.src = image;
-    img.onload = () => setLoading(false);
-    img.onerror = () => setLoading(false);
+    setLoading(!!image);
   }, [visible, image]);
 
   /** Compute placement on demand */
@@ -59,7 +59,6 @@ export default function TooltipPreview({ url, image, children }: TooltipPreviewP
     } else if (spaceAbove >= tooltipH + 10) {
       setPlacement("top");
     } else {
-      // Default to bottom if tight; users can scroll
       setPlacement("bottom");
     }
   }, []);
@@ -68,7 +67,6 @@ export default function TooltipPreview({ url, image, children }: TooltipPreviewP
   useEffect(() => {
     if (!visible) return;
     const onScrollOrResize = () => {
-      // debounce with rAF to avoid layout thrash
       requestAnimationFrame(updatePosition);
     };
     updatePosition();
@@ -129,41 +127,56 @@ export default function TooltipPreview({ url, image, children }: TooltipPreviewP
               top: placement === "bottom" ? "calc(100% + 8px)" : "auto",
               bottom: placement === "top" ? "calc(100% + 8px)" : "auto",
             }}
+            onMouseEnter={show}
+            onMouseLeave={scheduleHide}
           >
             <div className="flex flex-col space-y-2">
-              {/* Media area */}
-              {loading ? (
-                <div className="w-full h-32 bg-gray-700/70 rounded-md animate-pulse flex items-center justify-center">
-                  <svg
-                    className="animate-spin h-6 w-6 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
+              {/* Media area: fixed aspect ratio; Next/Image fills it */}
+              {image?.trim() ? (
+                <div
+                  className="relative w-full rounded-md overflow-hidden bg-gray-800"
+                  style={{ aspectRatio: "16 / 9" }} // tweak to "4/3" or "1/1" if you want
+                >
+                  {loading && (
+                    <div className="absolute inset-0 bg-gray-700/70 animate-pulse flex items-center justify-center z-0">
+                      <svg
+                        className="animate-spin h-6 w-6 text-gray-400"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                    </div>
+                  )}
+                  <NextImage
+                    src={image}
+                    alt="Preview"
+                    fill
+                    className="object-cover" // use "object-contain" if you don't want cropping
+                    sizes="256px"            // matches w-64 (~256px)
+                    onLoadingComplete={() => setLoading(false)}
+                    onError={() => setLoading(false)}
+                    priority={false}
+                  />
                 </div>
-              ) : image?.trim() ? (
-                <img
-                  src={image}
-                  alt="Preview"
-                  className="w-full h-32 rounded-md object-cover"
-                  loading="lazy"
-                />
               ) : (
-                <div className="w-full h-32 bg-gray-800 rounded-md flex flex-col items-center justify-center text-xs text-gray-500">
+                <div
+                  className="w-full rounded-md overflow-hidden bg-gray-800 flex flex-col items-center justify-center text-xs text-gray-500"
+                  style={{ aspectRatio: "16 / 9" }}
+                >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className="h-6 w-6 text-gray-600 mb-2"

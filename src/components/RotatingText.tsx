@@ -1,3 +1,5 @@
+"use client";
+
 import { motion, AnimatePresence } from "motion/react";
 import { useState, useEffect } from "react";
 
@@ -19,7 +21,7 @@ export default function RotatingText() {
       transition={{ delay: 0.1, duration: 0.4 }}
     >
       Full Stack Developer building full-featured websites and web apps with
-      MERN & Next.js — scalable, fast, and production-ready. I don't just
+      MERN &amp; Next.js — scalable, fast, and production-ready. I don&apos;t just
       prototype — I{" "}
       <span className="inline-block align-baseline">
         <span

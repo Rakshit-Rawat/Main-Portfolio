@@ -1,4 +1,3 @@
-// components/Home/SocialIcons.tsx
 "use client";
 
 import React from "react";
@@ -6,8 +5,7 @@ import { motion, Variants } from "motion/react";
 import {
   GithubIcon,
   LinkedInIcon,
-  TwitterIcon,
-  GoogleIcon,
+  GoogleIcon, // Removed TwitterIcon as it's not used
 } from "@/constants/icons";
 
 interface SocialIconsProps {
@@ -29,7 +27,7 @@ export default function SocialIcons({ isMounted, variants }: SocialIconsProps) {
       href: "https://linkedin.com/in/rakshit-2002-rawat",
       label: "LinkedIn",
     },
-    // { id: "twitter",  Icon: TwitterIcon, href: "https://twitter.com/yourhandle",  label: "Twitter/X" },
+    // TwitterIcon removed since it's commented out and unused
     {
       id: "google",
       Icon: GoogleIcon,

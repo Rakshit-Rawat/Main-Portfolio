@@ -1,10 +1,11 @@
 "use client";
+
 import { IconSunFilled, IconMoonFilled } from "@tabler/icons-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 export default function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme(); // Removed unused `theme`
   const [mounted, setMounted] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<"light" | "dark">("light");
 
