@@ -14,9 +14,10 @@ import {
 
 interface FooterProps {
   footerRef: React.RefObject<HTMLDivElement | null>;
+  visible?: boolean; // controlled by parent to avoid flashing before content
 }
 
-export default function Footer({  footerRef }: FooterProps) {
+export default function Footer({ footerRef, visible = false }: FooterProps) {
   const { scrollYProgress } = useScroll();
   const ZONE_START = 0.9;
 
@@ -85,18 +86,30 @@ export default function Footer({  footerRef }: FooterProps) {
 
   return (
     <motion.footer
-      initial={{ opacity: 0, x: -100 }}
-      animate={{
-        opacity: 1,
-        x: 0,
-        transition: { ease: [0.22, 1, 0.36, 1], duration: 0.3 },
-      }}
+      initial={false}                  // no opacity fade on hydration
+      animate={visible ? { x: 0 } : { x: 0 }}
+      transition={{ ease: [0.22, 1, 0.36, 1], duration: visible ? 0.2 : 0 }}
       ref={footerRef as React.RefObject<HTMLDivElement>}
-      className="fixed bottom-0 inset-x-0 z-50 mx-auto w-full max-w-3xl px-0 transform-gpu"
-      style={{ y, transformOrigin: "bottom center" }}
+      className="
+        fixed bottom-0 inset-x-0 z-50 mx-auto w-full max-w-3xl px-0
+        transform-gpu will-change-transform backface-hidden isolation-auto
+      "
+      style={{
+        y,
+        transformOrigin: "bottom center",
+        visibility: visible ? "visible" : "hidden", // hard-hide until parent says ready
+      }}
     >
       <div className="relative h-12">
-        {/* BACKGROUND PILL */}
+        {/* Opaque base to prevent background bleed on first frame */}
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 left-1/2 -translate-x-1/2 rounded-3xl
+                     bg-white dark:bg-gray-900"
+          style={{ width: widthCss, borderRadius: radius }}
+        />
+
+        {/* Translucent styled layer */}
         <motion.div
           aria-hidden
           className="absolute inset-y-0 left-1/2 -translate-x-1/2
@@ -108,7 +121,7 @@ export default function Footer({  footerRef }: FooterProps) {
           style={{ width: widthCss, borderRadius: radius }}
         />
 
-        {/* CONTENT PILL */}
+        {/* CONTENT */}
         <motion.div
           className="absolute inset-y-0 left-1/2 -translate-x-1/2
                      flex items-center justify-between gap-3 px-4 sm:px-6 text-sm
