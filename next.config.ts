@@ -2,11 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
+  productionBrowserSourceMaps: false,
+
   images: {
     domains: [
       "www.google.com",
-      "https://web-portfolio-ecru-two.vercel.app/",
-      "https://web-portfolio-data.vercel.app/",
+      "web-portfolio-ecru-two.vercel.app/",
+      "web-portfolio-data.vercel.app/",
     ],
   },
 };

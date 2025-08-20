@@ -23,7 +23,6 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
   const [direction, setDirection] = useState<"right" | "left">("right");
   const [isFirstLoad, setIsFirstLoad] = useState(true);
-  const [isFooterFixed, setIsFooterFixed] = useState(true);
 
   const prevTabRef = useRef<Tab>(activeTab);
   const footerRef = useRef<HTMLDivElement>(null);
@@ -41,46 +40,6 @@ export default function Home() {
     const timer = setTimeout(() => setIsFirstLoad(false), 500);
     return () => clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    const currentIndex = tabs.indexOf(activeTab);
-    const prevIndex = tabs.indexOf(prevTabRef.current);
-    setDirection(currentIndex > prevIndex ? "right" : "left");
-    prevTabRef.current = activeTab;
-  }, [activeTab]);
-
-  const checkFooterPosition = useCallback(() => {
-    if (!footerRef.current) return;
-
-    const scrollPosition = window.innerHeight + window.scrollY;
-    const documentHeight = document.documentElement.scrollHeight;
-    const footerHeight = footerRef.current.offsetHeight;
-    const threshold = 100;
-
-    setIsFooterFixed(scrollPosition < documentHeight - footerHeight - threshold);
-  }, []);
-
-  useEffect(() => {
-    const handleScroll = () => requestAnimationFrame(checkFooterPosition);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    checkFooterPosition();
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [checkFooterPosition]);
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(checkFooterPosition, 100),
-      setTimeout(checkFooterPosition, 300),
-      setTimeout(checkFooterPosition, 500),
-    ];
-    return () => timers.forEach(clearTimeout);
-  }, [activeTab, checkFooterPosition]);
-
-  useEffect(() => {
-    const handleResize = () => setTimeout(checkFooterPosition, 100);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [checkFooterPosition]);
 
   const getActiveTabIndex = () => tabs.indexOf(activeTab);
 
@@ -182,9 +141,9 @@ export default function Home() {
             }}
             className="w-full"
             style={{ transform: "translateZ(0)" }}
-            onAnimationComplete={() => {
-              setTimeout(() => checkFooterPosition(), 50);
-            }}
+            // onAnimationComplete={() => {
+            //   setTimeout(() => checkFooterPosition(), 50);
+            // }}
           >
             {activeTab === "skills" ? (
               <SkillsSection isFirstLoad={isFirstLoad} />
@@ -208,7 +167,7 @@ export default function Home() {
       </div>
 
       {/* Footer */}
-      <Footer isFooterFixed={isFooterFixed} footerRef={footerRef} />
+      <Footer  footerRef={footerRef} />
     </section>
   );
 }

@@ -13,11 +13,10 @@ import {
 } from "motion/react";
 
 interface FooterProps {
-  isFooterFixed: boolean; // unused, kept for API compatibility
   footerRef: React.RefObject<HTMLDivElement | null>;
 }
 
-export default function Footer({ isFooterFixed, footerRef }: FooterProps) {
+export default function Footer({  footerRef }: FooterProps) {
   const { scrollYProgress } = useScroll();
   const ZONE_START = 0.9;
 
