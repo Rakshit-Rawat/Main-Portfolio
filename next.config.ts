@@ -5,10 +5,15 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
 
   images: {
-    domains: [
-      "www.google.com",
-      "web-portfolio-ecru-two.vercel.app/",
-      "web-portfolio-data.vercel.app/",
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "web-portfolio-ecru-two.vercel.app/",
+      },
+      {
+        protocol: "https",
+        hostname: "web-portfolio-data.vercel.app/",
+      },
     ],
   },
 };

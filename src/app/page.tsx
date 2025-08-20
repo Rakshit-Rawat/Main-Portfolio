@@ -1,168 +1,170 @@
 "use client";
 
-import React, { useLayoutEffect, useRef } from "react";
-import { Resume, ContactMe } from "@/constants/icons";
-import { SiNextdotjs } from "react-icons/si";
-import {
-  motion,
-  useScroll,
-  useTransform,
-  useSpring,
-  useMotionValue,
-  type MotionValue,
-} from "motion/react";
+import { useState, useEffect, useRef } from "react";
+import ThemeToggle from "@/components/theme-toggle";
+import { motion, AnimatePresence, Variants } from "motion/react";
+import { personalProjects as projects, templates } from "@/constants";
+import Card from "@/components/Home/Card";
+import SkillsSection from "@/components/Home/SkillsSection";
+import SocialIcons from "@/components/Home/SocialIcons";
+import RotatingText from "@/components/RotatingText";
+import Footer from "@/components/Home/Footer";
 
-interface FooterProps {
-  footerRef: React.RefObject<HTMLDivElement | null>;
-  visible?: boolean; // controlled by parent to avoid flashing before content
-}
+type Tab = "projects" | "templates" | "skills";
+const tabs: Tab[] = ["templates", "projects", "skills"];
 
-export default function Footer({ footerRef, visible = false }: FooterProps) {
-  const { scrollYProgress } = useScroll();
-  const ZONE_START = 0.9;
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>("templates");
+  const [isMounted, setIsMounted] = useState(false);
+  const [isFirstLoad, setIsFirstLoad] = useState(true);
+  const [direction, setDirection] = useState<"right" | "left">("right");
+  const [footerReady, setFooterReady] = useState(false); // gate footer visibility
 
-  // --- Short page detection: drive a target and smooth it with a single spring
-  const forceOpenTarget = useMotionValue(0);
-  const forceOpen = useSpring(forceOpenTarget, {
-    stiffness: 300,
-    damping: 32,
-    restDelta: 0.0008,
-  });
+  const footerRef = useRef<HTMLDivElement>(null);
+  const prevTabRef = useRef<Tab>(activeTab);
 
-  const rafId = useRef<number | null>(null);
-  const lastShort = useRef<boolean | null>(null);
+  const tabLabels: Record<Tab, string> = {
+    templates: "Templates",
+    projects: "Projects",
+    skills: "Expertise",
+  };
 
-  useLayoutEffect(() => {
-    const root = document.documentElement;
+  const getIndex = (t: Tab) => tabs.indexOf(t);
 
-    const measure = () => {
-      const short = root.scrollHeight <= window.innerHeight + 1;
-      if (short !== lastShort.current) {
-        lastShort.current = short;
-        // set instantly; spring handles easing
-        forceOpenTarget.set(short ? 1 : 0);
-      }
-    };
-
-    const onObserved = () => {
-      if (rafId.current != null) return;
-      rafId.current = requestAnimationFrame(() => {
-        rafId.current = null;
-        measure();
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(onObserved);
-    ro.observe(root);
-    window.addEventListener("resize", onObserved);
+  useEffect(() => {
+    setIsMounted(true);
+    const t1 = setTimeout(() => setIsFirstLoad(false), 400);
+    const t2 = setTimeout(() => setFooterReady(true), 550); // fallback in case onAnimationComplete doesn't fire
     return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", onObserved);
-      if (rafId.current != null) cancelAnimationFrame(rafId.current);
+      clearTimeout(t1);
+      clearTimeout(t2);
     };
-  }, [forceOpenTarget]);
+  }, []);
 
-  // --- Blend scroll with forceOpen without multi-input overloads
-  // prog = lerp(scrollYProgress, 1, forceOpen)
-  const blended: MotionValue<number> = useTransform(() => {
-    const p = scrollYProgress.get();
-    const f = forceOpen.get();
-    return p * (1 - f) + f;
-  });
+  // update direction based on tab order (prev -> current)
+  useEffect(() => {
+    const prev = prevTabRef.current;
+    const curr = activeTab;
+    const dir = getIndex(curr) > getIndex(prev) ? "right" : "left";
+    setDirection(dir);
+    prevTabRef.current = curr;
+  }, [activeTab]);
 
-  // Single global smoothing so tab switches & short pages feel seamless
-  const prog = useSpring(blended, {
-    stiffness: 280,
-    damping: 30,
-    restDelta: 0.0008,
-  });
-
-  // --- Map the ONE driver to all visuals (no extra springs)
-  const y = useTransform(prog, [ZONE_START, 1], [-16, 0]);
-  const widthPct = useTransform(prog, [ZONE_START, 1], [60, 80]);
-  const widthCss = useTransform(widthPct, (v) => `${v}%`);
-  const radius = useTransform(prog, [ZONE_START, 1], [16, 10]);
+  const headerVariants: Variants = {
+    hidden: { opacity: 0, x: -30 },
+    visible: {
+      opacity: 1,
+      x: 0,
+      transition: { duration: 0.4, ease: [0.25, 0.1, 0.25, 1] },
+    },
+  };
 
   return (
-    <motion.footer
-      initial={false}                  // no opacity fade on hydration
-      animate={visible ? { x: 0 } : { x: 0 }}
-      transition={{ ease: [0.22, 1, 0.36, 1], duration: visible ? 0.2 : 0 }}
-      ref={footerRef as React.RefObject<HTMLDivElement>}
-      className="
-        fixed bottom-0 inset-x-0 z-50 mx-auto w-full max-w-3xl px-0
-        transform-gpu will-change-transform backface-hidden isolation-auto
-      "
-      style={{
-        y,
-        transformOrigin: "bottom center",
-        visibility: visible ? "visible" : "hidden", // hard-hide until parent says ready
-      }}
-    >
-      <div className="relative h-12">
-        {/* Opaque base to prevent background bleed on first frame */}
-        <motion.div
-          aria-hidden
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2 rounded-2xl
-                     bg-white dark:bg-gray-900"
-          style={{ width: widthCss, borderRadius: radius }}
-        />
+    <section className="min-h-screen flex flex-col pt-10 transition-colors duration-200 max-w-4xl mx-auto px-4">
+      {/* Header */}
+      <motion.div
+        className="flex justify-between w-full items-center"
+        variants={headerVariants}
+        initial={isMounted ? "visible" : "hidden"}
+        animate="visible"
+      >
+        <h1 className="text-2xl font-semibold text-main-text dark:text-main-text">
+          Hey, I&apos;m Rakshit
+        </h1>
+        <div className="w-10 h-10 flex items-center justify-center">
+          <ThemeToggle />
+        </div>
+      </motion.div>
 
-        {/* Translucent styled layer */}
-        <motion.div
-          aria-hidden
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2
-                     rounded-2xl border shadow-md
-                     bg-white/80 dark:bg-gray-900/80
-                     border-gray-300 dark:border-gray-700
-                     backdrop-blur-md backdrop-saturate-150
-                     will-change-[width,transform,border-radius]"
-          style={{ width: widthCss, borderRadius: radius }}
-        />
+      {/* Bio */}
+      <RotatingText />
 
-        {/* CONTENT */}
-        <motion.div
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2
-                     flex items-center justify-between gap-3 px-4 sm:px-6 text-sm
-                     rounded-2xl text-gray-800 dark:text-gray-200
-                     will-change-[width,transform,border-radius]"
-          style={{ width: widthCss, borderRadius: radius, overflow: "hidden" }}
-        >
-          <div className="flex items-center gap-2">
-            <span>Built with</span>
-            <SiNextdotjs className="text-xl" aria-hidden />
-          </div>
+      {/* Social */}
+      <SocialIcons isMounted={isMounted} variants={headerVariants} />
 
-          <div className="flex items-center gap-3">
-            <a
-              href="/Rakshit_Rawat.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Resume"
-              title="Resume"
+      {/* Tabs */}
+      <motion.div
+        className="relative mt-8"
+        variants={headerVariants}
+        initial={isMounted ? "visible" : "hidden"}
+        animate="visible"
+        transition={{ delay: 0.3 }}
+      >
+        <div className="flex justify-between relative">
+          {/* Active underline */}
+          <motion.div
+            className="absolute bottom-0 h-0.5 bg-black dark:bg-white rounded-full"
+            layout
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            style={{
+              width: `${100 / tabs.length}%`,
+              left: `${(100 / tabs.length) * getIndex(activeTab)}%`,
+            }}
+          />
+          {tabs.map((tab) => (
+            <motion.button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`relative flex-1 py-3 text-center text-sm font-medium z-10 ${
+                activeTab === tab
+                  ? "text-black dark:text-white font-semibold"
+                  : "text-neutral-600 dark:text-neutral-500"
+              }`}
+              whileTap={{ scale: 0.98 }}
             >
-              <Resume className="h-4 w-4" />
-              <span className="ml-2 whitespace-nowrap">View CV</span>
-            </a>
+              {tabLabels[tab]}
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
 
-            <a
-              href="mailto:rakshit@example.com"
-              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Contact me"
-              title="Contact me"
-            >
-              <ContactMe className="h-4 w-4" />
-              <span className="ml-2 whitespace-nowrap">Contact me</span>
-            </a>
-          </div>
-        </motion.div>
+      {/* Content */}
+      <div className="mt-8 mb-6 flex-1">
+        <AnimatePresence mode="wait" custom={direction}>
+          <motion.div
+            key={activeTab}
+            custom={direction}
+            initial={{
+              opacity: isFirstLoad ? 1 : 0,
+              // enter from the direction you're moving TOWARD
+              x: isFirstLoad ? 0 : direction === "right" ? -30 : 30,
+            }}
+            animate={{
+              opacity: 1,
+              x: 0,
+              transition: { duration: isFirstLoad ? 0 : 0.4, ease: [0.25, 0.1, 0.25, 1] },
+            }}
+            exit={{
+              opacity: 0,
+              // leave opposite direction
+              x: direction === "right" ? 30 : -30,
+              transition: { duration: 0.35, ease: [0.25, 0.1, 0.25, 1] },
+            }}
+            className="w-full will-change-transform"
+            style={{ transform: "translateZ(0)" }}
+            onAnimationComplete={() => setFooterReady(true)} // signal footer can show
+          >
+            {activeTab === "skills" ? (
+              <SkillsSection isFirstLoad={isFirstLoad} />
+            ) : (
+              <div className="space-y-8 mb-10">
+                {(activeTab === "projects" ? projects : templates).map((item, index) => (
+                  <Card
+                    key={item.name}
+                    item={item}
+                    index={index}
+                    isFirstLoad={isFirstLoad}
+                    tab={activeTab}
+                  />
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
-    </motion.footer>
+
+      {/* Footer (hidden until footerReady) */}
+      <Footer footerRef={footerRef} visible={footerReady} />
+    </section>
   );
 }

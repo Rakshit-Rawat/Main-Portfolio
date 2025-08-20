@@ -1,5 +1,3 @@
-"use client";
-
 import React, { useLayoutEffect, useRef } from "react";
 import { Resume, ContactMe } from "@/constants/icons";
 import { SiNextdotjs } from "react-icons/si";
