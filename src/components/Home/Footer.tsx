@@ -1,134 +1,155 @@
 "use client";
 
+import React, { useLayoutEffect, useRef } from "react";
+import { Resume, ContactMe } from "@/constants/icons";
+import { SiNextdotjs } from "react-icons/si";
 import {
   motion,
   useScroll,
-  useSpring,
   useTransform,
-  useMotionValueEvent,
+  useSpring,
+  useMotionValue,
+  type MotionValue,
 } from "motion/react";
-import { useEffect, useMemo } from "react";
-import { Resume, ContactMe } from "@/constants/icons";
-import { SiNextdotjs } from "react-icons/si";
 
 interface FooterProps {
-  isFooterFixed: boolean;
+  isFooterFixed: boolean; // unused, kept for API compatibility
   footerRef: React.RefObject<HTMLDivElement | null>;
 }
 
 export default function Footer({ isFooterFixed, footerRef }: FooterProps) {
-  const { scrollY } = useScroll();
+  const { scrollYProgress } = useScroll();
+  const ZONE_START = 0.9;
 
-  // springs
-  const springCfg = useMemo(
-    () => ({ stiffness: 220, damping: 26, mass: 0.6 }),
-    []
-  );
-  const progress = useSpring(0, springCfg);
-
-  useMotionValueEvent(scrollY, "change", (v) => {
-    if (!isFooterFixed) return;
-    const p = Math.min(1, Math.max(0, v / 300));
-    progress.set(p);
+  // --- Short page detection: drive a target and smooth it with a single spring
+  const forceOpenTarget = useMotionValue(0);
+  const forceOpen = useSpring(forceOpenTarget, {
+    stiffness: 300,
+    damping: 32,
+    restDelta: 0.0008,
   });
 
-  useEffect(() => {
-    if (!isFooterFixed) progress.set(0);
-  }, [isFooterFixed, progress]);
+  const rafId = useRef<number | null>(null);
+  const lastShort = useRef<boolean | null>(null);
 
-  const y = useTransform(progress, [0, 1], [0, -10]);
-  const widthPct = useTransform(progress, [0, 1], [92, 85]);
-  const width = useTransform(widthPct, (v) => `${v}%`);
-  const boxShadow = useTransform(
-    progress,
-    [0, 0.07, 1],
-    ["none", "var(--shadow-ace)", "var(--shadow-ace)"]
-  );
+  useLayoutEffect(() => {
+    const root = document.documentElement;
 
-  const footerBottom = useSpring(isFooterFixed ? 16 : 0, springCfg);
-  const footerMaxWidth = useSpring(isFooterFixed ? 320 : 672, springCfg);
-  const footerBorderRadius = useSpring(isFooterFixed ? 24 : 0, springCfg);
+    const measure = () => {
+      const short = root.scrollHeight <= window.innerHeight + 1;
+      if (short !== lastShort.current) {
+        lastShort.current = short;
+        // set instantly; spring handles easing
+        forceOpenTarget.set(short ? 1 : 0);
+      }
+    };
 
-  useEffect(() => {
-    footerBottom.set(isFooterFixed ? 16 : 0);
-    footerMaxWidth.set(isFooterFixed ? 320 : 672);
-    footerBorderRadius.set(isFooterFixed ? 24 : 0);
-  }, [isFooterFixed, footerBottom, footerMaxWidth, footerBorderRadius]);
+    const onObserved = () => {
+      if (rafId.current != null) return;
+      rafId.current = requestAnimationFrame(() => {
+        rafId.current = null;
+        measure();
+      });
+    };
 
-  // label animation targets
-  const labelAnimate = (show: boolean) => ({
-    opacity: show ? 1 : 0,
-    maxWidth: show ? 80 : 0, // px; tweak if your label is longer
-    marginLeft: show ? 8 : 0,
+    measure();
+    const ro = new ResizeObserver(onObserved);
+    ro.observe(root);
+    window.addEventListener("resize", onObserved);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", onObserved);
+      if (rafId.current != null) cancelAnimationFrame(rafId.current);
+    };
+  }, [forceOpenTarget]);
+
+  // --- Blend scroll with forceOpen without multi-input overloads
+  // prog = lerp(scrollYProgress, 1, forceOpen)
+  const blended: MotionValue<number> = useTransform(() => {
+    const p = scrollYProgress.get();
+    const f = forceOpen.get();
+    return p * (1 - f) + f;
   });
+
+  // Single global smoothing so tab switches & short pages feel seamless
+  const prog = useSpring(blended, {
+    stiffness: 280,
+    damping: 30,
+    restDelta: 0.0008,
+  });
+
+  // --- Map the ONE driver to all visuals (no extra springs)
+  const y = useTransform(prog, [ZONE_START, 1], [-16, 0]);
+  const widthPct = useTransform(prog, [ZONE_START, 1], [60, 80]);
+  const widthCss = useTransform(widthPct, (v) => `${v}%`);
+  const radius = useTransform(prog, [ZONE_START, 1], [16, 10]);
 
   return (
     <motion.footer
-      initial={{ scaleY: 0, opacity: 0 }}
-      animate={{ scaleY: 1, opacity: 1 }}
-      transition={{ duration: 0.6, ease: [0.25, 0.1, 0.25, 1] }}
-      ref={footerRef}
-      style={{
-        y: isFooterFixed ? y : 0,
-        width: isFooterFixed ? width : "100%",
-        boxShadow: isFooterFixed ? boxShadow : "none",
-        bottom: footerBottom,
-        maxWidth: footerMaxWidth,
-        borderRadius: footerBorderRadius,
-        willChange: "transform, width, box-shadow",
-        transformOrigin: "bottom",
+      initial={{ opacity: 0, x: -100 }}
+      animate={{
+        opacity: 1,
+        x: 0,
+        transition: { ease: [0.22, 1, 0.36, 1], duration: 0.3 },
       }}
-      className="fixed z-50 h-12 left-1/2 -translate-x-1/2 transform-gpu bg-gray-900 dark:bg-gray-800 border border-gray-700 dark:border-gray-600"
+      ref={footerRef as React.RefObject<HTMLDivElement>}
+      className="fixed bottom-0 inset-x-0 z-50 mx-auto w-full max-w-3xl px-0 transform-gpu"
+      style={{ y, transformOrigin: "bottom center" }}
     >
-      <div className="flex h-full items-center justify-between gap-3 px-4 sm:px-6 text-sm">
-        {/* Left: credit */}
-        <div className="flex items-center gap-2 text-gray-300">
-          <span>Built with</span>
-          <SiNextdotjs className="text-xl text-white" aria-hidden />
-        </div>
+      <div className="relative h-12">
+        {/* BACKGROUND PILL */}
+        <motion.div
+          aria-hidden
+          className="absolute inset-y-0 left-1/2 -translate-x-1/2
+                     rounded-2xl border shadow-md
+                     bg-white/80 dark:bg-gray-900/80
+                     border-gray-300 dark:border-gray-700
+                     backdrop-blur-md backdrop-saturate-150
+                     will-change-[width,transform,border-radius]"
+          style={{ width: widthCss, borderRadius: radius }}
+        />
 
-        {/* Right: same two buttons always mounted; labels animate in/out */}
-        <div className="flex items-center gap-3">
-          {/* Resume */}
-          <a
-            href="/Rakshit_Rawat_Resume.pdf"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md border border-gray-600/70 bg-white px-3 py-1.5 text-gray-900 hover:bg-gray-100 hover:border-gray-500 transition-colors"
-            aria-label="Resume"
-            title="Resume"
-          >
-            <Resume className="h-4 w-4" />
-            {/* label wrapper: overflow-hidden so width can collapse cleanly */}
-            <motion.span
-              className="overflow-hidden inline-block"
-              initial={false}
-              animate={labelAnimate(!isFooterFixed)} // show label when docked
-              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
-            >
-              {/* Real text goes inside so we don't shift layout when hidden */}
-              <span className="whitespace-nowrap">Resume</span>
-            </motion.span>
-          </a>
+        {/* CONTENT PILL */}
+        <motion.div
+          className="absolute inset-y-0 left-1/2 -translate-x-1/2
+                     flex items-center justify-between gap-3 px-4 sm:px-6 text-sm
+                     rounded-2xl text-gray-800 dark:text-gray-200
+                     will-change-[width,transform,border-radius]"
+          style={{ width: widthCss, borderRadius: radius, overflow: "hidden" }}
+        >
+          <div className="flex items-center gap-2">
+            <span>Built with</span>
+            <SiNextdotjs className="text-xl" aria-hidden />
+          </div>
 
-          {/* Contact me */}
-          <a
-            href="mailto:rakshit@example.com"
-            className="inline-flex items-center rounded-md bg-white text-gray-900 px-3 py-1.5 hover:bg-gray-100 transition-colors"
-            aria-label="Contact me"
-            title="Contact me"
-          >
-            <ContactMe className="h-4 w-4" />
-            <motion.span
-              className="overflow-hidden inline-block"
-              initial={false}
-              animate={labelAnimate(!isFooterFixed)}
-              transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+          <div className="flex items-center gap-3">
+            <a
+              href="/Rakshit_Rawat.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Resume"
+              title="Resume"
             >
-              <span className="whitespace-nowrap">Contact me</span>
-            </motion.span>
-          </a>
-        </div>
+              <Resume className="h-4 w-4" />
+              <span className="ml-2 whitespace-nowrap">View CV</span>
+            </a>
+
+            <a
+              href="mailto:rakshit@example.com"
+              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
+                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              aria-label="Contact me"
+              title="Contact me"
+            >
+              <ContactMe className="h-4 w-4" />
+              <span className="ml-2 whitespace-nowrap">Contact me</span>
+            </a>
+          </div>
+        </motion.div>
       </div>
     </motion.footer>
   );
