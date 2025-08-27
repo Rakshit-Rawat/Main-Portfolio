@@ -9,7 +9,7 @@ interface CardProps {
   item: ProjectType | TemplateType;
   index: number;
   isFirstLoad: boolean;
-  tab: "projects" | "templates" | "skills";
+  tab: "projects" | "uiTemplates" | "skills";
 }
 
 function isProject(item: ProjectType | TemplateType): item is ProjectType {
@@ -28,7 +28,9 @@ const Card: React.FC<CardProps> = ({ item, index, isFirstLoad, tab }) => {
         ease: [0.25, 0.1, 0.25, 1],
       }}
     >
+      
       <div className="flex justify-between items-start">
+        
         <h4 className="font-semibold group-hover:text-muted-foreground transition-colors cursor-pointer">
           {item.name}
         </h4>

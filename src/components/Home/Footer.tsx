@@ -1,4 +1,6 @@
-import React, { useLayoutEffect, useRef } from "react";
+"use client";
+
+import React, { useState } from "react";
 import { Resume, ContactMe } from "@/constants/icons";
 import { SiNextdotjs } from "react-icons/si";
 import {
@@ -6,161 +8,115 @@ import {
   useScroll,
   useTransform,
   useSpring,
-  useMotionValue,
-  type MotionValue,
+  useMotionValueEvent,
 } from "motion/react";
 
 interface FooterProps {
   footerRef: React.RefObject<HTMLDivElement | null>;
-  visible?: boolean; // controlled by parent to avoid flashing before content
+  visible?: boolean;
+  isScrollable: boolean;
 }
 
-export default function Footer({ footerRef, visible = false }: FooterProps) {
-  const { scrollYProgress } = useScroll();
-  const ZONE_START = 0.9;
+export default function Footer({
+  footerRef,
+  visible = false,
+  isScrollable,
+}: FooterProps) {
+  const { scrollY, scrollYProgress } = useScroll();
+  const [scrolled, setScrolled] = useState(false);
 
-  // --- Short page detection: drive a target and smooth it with a single spring
-  const forceOpenTarget = useMotionValue(0);
-  const forceOpen = useSpring(forceOpenTarget, {
+  // mimic your navbar: small motion as the user scrolls
+  // lift the footer a touch and tighten its width + corners
+  const yRaw = useTransform(scrollYProgress, [0.7, 1], [-10, 0]);
+  const widthRaw = useTransform(scrollYProgress, [0.7, 1], ["60%", "80%"]);
+  const radiusRaw = useTransform(scrollY, [0, 100], [16, 10]);
+  const scrolledMV = useTransform(() => {
+    const px = scrollY.get();
+    const prog = scrollYProgress.get();
+    return px > 10 && prog > 0.95;
+  });
+
+  // smooth springs
+  const y = useSpring(yRaw, { stiffness: 300, damping: 30, restDelta: 0.001 });
+  const width = useSpring(widthRaw, {
     stiffness: 300,
-    damping: 32,
-    restDelta: 0.0008,
-  });
-
-  const rafId = useRef<number | null>(null);
-  const lastShort = useRef<boolean | null>(null);
-
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-
-    const measure = () => {
-      const short = root.scrollHeight <= window.innerHeight + 1;
-      if (short !== lastShort.current) {
-        lastShort.current = short;
-        // set instantly; spring handles easing
-        forceOpenTarget.set(short ? 1 : 0);
-      }
-    };
-
-    const onObserved = () => {
-      if (rafId.current != null) return;
-      rafId.current = requestAnimationFrame(() => {
-        rafId.current = null;
-        measure();
-      });
-    };
-
-    measure();
-    const ro = new ResizeObserver(onObserved);
-    ro.observe(root);
-    window.addEventListener("resize", onObserved);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", onObserved);
-      if (rafId.current != null) cancelAnimationFrame(rafId.current);
-    };
-  }, [forceOpenTarget]);
-
-  // --- Blend scroll with forceOpen without multi-input overloads
-  // prog = lerp(scrollYProgress, 1, forceOpen)
-  const blended: MotionValue<number> = useTransform(() => {
-    const p = scrollYProgress.get();
-    const f = forceOpen.get();
-    return p * (1 - f) + f;
-  });
-
-  // Single global smoothing so tab switches & short pages feel seamless
-  const prog = useSpring(blended, {
-    stiffness: 280,
     damping: 30,
-    restDelta: 0.0008,
+    restDelta: 0.001,
+  });
+  const radius = useSpring(radiusRaw, {
+    stiffness: 300,
+    damping: 30,
+    restDelta: 0.001,
   });
 
-  // --- Map the ONE driver to all visuals (no extra springs)
-  const y = useTransform(prog, [ZONE_START, 1], [-16, 0]);
-  const widthPct = useTransform(prog, [ZONE_START, 1], [60, 80]);
-  const widthCss = useTransform(widthPct, (v) => `${v}%`);
-  const radius = useTransform(prog, [ZONE_START, 1], [16, 10]);
+  // shadow/rounded toggle (same pattern as navbar)
+  useMotionValueEvent(scrolledMV, "change", (latest) => {
+    setScrolled(latest);
+  });
 
   return (
     <motion.footer
-      initial={false}                  // no opacity fade on hydration
-      animate={visible ? { x: 0 } : { x: 0 }}
-      transition={{ ease: [0.22, 1, 0.36, 1], duration: visible ? 0.2 : 0 }}
       ref={footerRef as React.RefObject<HTMLDivElement>}
-      className="
-        fixed bottom-0 inset-x-0 z-50 mx-auto w-full max-w-3xl px-0
-        transform-gpu will-change-transform backface-hidden isolation-auto
-      "
+      className="fixed bottom-0 inset-x-0 z-50 mx-auto flex w-full max-w-3xl justify-center px-0 "
       style={{
         y,
-        transformOrigin: "bottom center",
-        visibility: visible ? "visible" : "hidden", // hard-hide until parent says ready
+        visibility: visible ? "visible" : "hidden", // no flash before parent is ready
+      }}
+      transition={{
+        // only transition box shadow changes for a nicer snap
+        boxShadow: { duration: 0.3, ease: "easeInOut" },
       }}
     >
-      <div className="relative h-12">
-        {/* Opaque base to prevent background bleed on first frame */}
-        <motion.div
-          aria-hidden
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2 rounded-3xl
-                     bg-white dark:bg-gray-900"
-          style={{ width: widthCss, borderRadius: radius }}
-        />
+      <motion.div
+        className={[
+          "flex w-full items-center justify-between gap-3 px-4 sm:px-6 py-2",
+          "bg-white/80 dark:bg-gray-900/80 ",
+          scrolled && isScrollable
+            ? "rounded-full shadow-md border border-transparent"
+            : "rounded-2xl border border-gray-300 dark:border-gray-700",
+          "backdrop-blur-md backdrop-saturate-150",
+          "text-gray-800 dark:text-gray-200",
+        ].join(" ")}
+        style={{
+          width,
+          borderRadius: radius as unknown as number, // keep corners synced with width
+        }}
+      >
+        {/* Left */}
+        <div className="flex items-center gap-2">
+          <span>Built with</span>
+          <SiNextdotjs className="text-xl" aria-hidden />
+        </div>
 
-        {/* Translucent styled layer */}
-        <motion.div
-          aria-hidden
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2
-                     rounded-2xl border shadow-md
-                     bg-white/80 dark:bg-gray-900/80
-                     border-gray-300 dark:border-gray-700
-                     backdrop-blur-md backdrop-saturate-150
-                     will-change-[width,transform,border-radius]"
-          style={{ width: widthCss, borderRadius: radius }}
-        />
+        {/* Right */}
+        <div className="flex items-center gap-3">
+          <a
+            href="/Rakshit_Rawat.pdf"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                       px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Resume"
+            title="Resume"
+          >
+            <Resume className="h-4 w-4" />
+            <span className="ml-2 whitespace-nowrap">View Resume</span>
+          </a>
 
-        {/* CONTENT */}
-        <motion.div
-          className="absolute inset-y-0 left-1/2 -translate-x-1/2
-                     flex items-center justify-between gap-3 px-4 sm:px-6 text-sm
-                     rounded-2xl text-gray-800 dark:text-gray-200
-                     will-change-[width,transform,border-radius]"
-          style={{ width: widthCss, borderRadius: radius, overflow: "hidden" }}
-        >
-          <div className="flex items-center gap-2">
-            <span>Built with</span>
-            <SiNextdotjs className="text-xl" aria-hidden />
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a
-              href="/Rakshit_Rawat.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Resume"
-              title="Resume"
-            >
-              <Resume className="h-4 w-4" />
-              <span className="ml-2 whitespace-nowrap">View CV</span>
-            </a>
-
-            <a
-              href="mailto:rakshit@example.com"
-              className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
-                         bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
-                         px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Contact me"
-              title="Contact me"
-            >
-              <ContactMe className="h-4 w-4" />
-              <span className="ml-2 whitespace-nowrap">Contact me</span>
-            </a>
-          </div>
-        </motion.div>
-      </div>
+          <a
+            href="mailto:rakshit@example.com"
+            className="inline-flex items-center rounded-md border border-gray-300 dark:border-gray-600
+                       bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                       px-3 py-1.5 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            aria-label="Contact me"
+            title="Contact me"
+          >
+            <ContactMe className="h-4 w-4" />
+            <span className="ml-2 whitespace-nowrap">Get In Touch</span>
+          </a>
+        </div>
+      </motion.div>
     </motion.footer>
   );
 }
